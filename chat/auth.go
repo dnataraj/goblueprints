@@ -1,7 +1,12 @@
 package main
 
 import (
+	"context"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/github"
 	"log"
 	"net/http"
 	"strings"
@@ -10,6 +15,23 @@ import (
 type authHandler struct {
 	next http.Handler
 }
+
+type User struct {
+	Login   string
+	Name    string
+	HTMLURL string `json:"html_url"`
+}
+
+// OAuth 2.0 init and config
+var conf = &oauth2.Config{
+	ClientID:     "b9d234ae03ae0a688e64",
+	ClientSecret: "30548529437ad927b7e088ae67441555f658ac31",
+	Endpoint:     github.Endpoint,
+	RedirectURL:  "http://localhost:8080/auth/callback/github",
+	Scopes:       nil,
+}
+
+var ctx = context.Background()
 
 func (h *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, err := r.Cookie("auth")
@@ -39,6 +61,42 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	switch action {
 	case "login":
 		log.Println("TODO handle login for", provider)
+		loginUrl := conf.AuthCodeURL("", oauth2.AccessTypeOffline)
+		log.Println("Found auth url > ", loginUrl)
+		w.Header().Set("Location", loginUrl)
+		w.WriteHeader(http.StatusTemporaryRedirect)
+	case "callback":
+		code := r.URL.Query().Get("code")
+		if code == "" {
+			http.Error(w, "authorization code not found", http.StatusBadRequest)
+			return
+		}
+		token, err := conf.Exchange(ctx, code)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		client := conf.Client(ctx, token)
+		response, err := client.Get("https://api.github.com/user")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer response.Body.Close()
+		//fmt.Fprintf(w, "User Info : %s\n", userInfo)
+		var user User
+		if err := json.NewDecoder(response.Body).Decode(&user); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		data, err := json.Marshal(user)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{Name: "auth", Value: base64.URLEncoding.EncodeToString(data), Path: "/"})
+		w.Header().Set("Location", "/chat")
+		w.WriteHeader(http.StatusTemporaryRedirect)
 	default:
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprintf(w, "auth action %s not supported", action)
