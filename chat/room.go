@@ -12,6 +12,7 @@ type room struct {
 	join    chan *client
 	leave   chan *client
 	clients map[*client]bool
+	avatar  Avatar // avatar is how rooms obtain avatar information
 	tracer  trace.Tracer
 }
 
@@ -71,12 +72,13 @@ func (r *room) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	client.read()
 }
 
-func newRoom() *room {
+func newRoom(avatar Avatar) *room {
 	return &room{
 		forward: make(chan *message),
 		join:    make(chan *client),
 		leave:   make(chan *client),
 		clients: make(map[*client]bool),
+		avatar:  avatar,
 		tracer:  trace.Off(),
 	}
 }

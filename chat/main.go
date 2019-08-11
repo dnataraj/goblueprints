@@ -18,12 +18,22 @@ type templateHandler struct {
 func main() {
 	var addr = flag.String("addr", ":8080", "The address of the application.")
 	flag.Parse()
-	r := newRoom()
+	r := newRoom(UseAuthAvatar)
 	//r.tracer = trace.New(os.Stdout)
 	http.Handle("/chat", MustAuth(&templateHandler{filename: "chat.html"}))
 	http.Handle("/login", &templateHandler{filename: "login.html"})
 	http.HandleFunc("/auth/", loginHandler)
 	http.Handle("/room", r)
+	http.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
+		http.SetCookie(w, &http.Cookie{
+			Name:   "auth",
+			Value:  "",
+			Path:   "/",
+			MaxAge: -1,
+		})
+		w.Header().Set("Location", "/chat")
+		w.WriteHeader(http.StatusTemporaryRedirect)
+	})
 	go r.run()
 	// start the web server
 	log.Println("Starting the web server on", *addr)

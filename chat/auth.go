@@ -17,9 +17,10 @@ type authHandler struct {
 }
 
 type User struct {
-	Login   string
-	Name    string
-	HTMLURL string `json:"html_url"`
+	Login     string
+	Name      string
+	HTMLURL   string `json:"html_url"`
+	AvatarURL string `json:"avatar_url"`
 }
 
 // OAuth 2.0 init and config
@@ -34,8 +35,8 @@ var conf = &oauth2.Config{
 var ctx = context.Background()
 
 func (h *authHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	_, err := r.Cookie("auth")
-	if err == http.ErrNoCookie {
+	cookie, err := r.Cookie("auth")
+	if err == http.ErrNoCookie || cookie.Value == "" {
 		// not authenticated
 		w.Header().Set("Location", "/login")
 		w.WriteHeader(http.StatusTemporaryRedirect)
