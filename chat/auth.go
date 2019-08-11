@@ -62,7 +62,6 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	case "login":
 		log.Println("TODO handle login for", provider)
 		loginUrl := conf.AuthCodeURL("", oauth2.AccessTypeOffline)
-		log.Println("Found auth url > ", loginUrl)
 		w.Header().Set("Location", loginUrl)
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	case "callback":
@@ -101,4 +100,17 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprintf(w, "auth action %s not supported", action)
 	}
+}
+
+func unwrapCookie(cookie *http.Cookie) (*User, error) {
+	value, err := base64.URLEncoding.DecodeString(cookie.Value)
+	if err != nil {
+		return nil, fmt.Errorf("retrieving auth cookie value failed: %s", err)
+	}
+	var user User
+	if err := json.Unmarshal(value, &user); err != nil {
+		return nil, fmt.Errorf("JSON unmarshalling failed: %s", err)
+	}
+
+	return &user, nil
 }

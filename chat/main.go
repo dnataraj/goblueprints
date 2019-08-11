@@ -37,5 +37,15 @@ func (t *templateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	t.once.Do(func() {
 		t.templ = template.Must(template.ParseFiles(filepath.Join("templates", t.filename)))
 	})
-	t.templ.Execute(w, r)
+	data := map[string]interface{}{
+		"Host": r.Host,
+	}
+	if authCookie, err := r.Cookie("auth"); err == nil {
+		// Unmarshal data
+		if user, err := unwrapCookie(authCookie); err == nil {
+			data["UserData"] = *user
+		}
+	}
+	log.Printf("data : %s\n", data)
+	t.templ.Execute(w, data)
 }
