@@ -36,8 +36,19 @@ type GravatarAvatar struct{}
 var UseGravatar GravatarAvatar
 
 func (GravatarAvatar) GetAvatarURL(c *client) (string, error) {
-	if c.userData == nil || len(c.userData.userId) == 0 {
+	if c.userData == nil || len(c.userData.UserId) == 0 {
 		return "", ErrNoAvatarURL
 	}
-	return fmt.Sprintf("//www.gravatar.com/avatar/%s", c.userData.userId), nil
+	return fmt.Sprintf("//www.gravatar.com/avatar/%s", c.userData.UserId), nil
+}
+
+type FileSystemAvatar struct{}
+
+var UseFileSystemAvatar FileSystemAvatar
+
+func (FileSystemAvatar) GetAvatarURL(c *client) (string, error) {
+	if c.userData == nil || len(c.userData.UserId) == 0 {
+		return "", ErrNoAvatarURL
+	}
+	return fmt.Sprintf("/avatars/%s.jpg", c.userData.UserId), nil
 }

@@ -19,7 +19,7 @@ type authHandler struct {
 }
 
 type User struct {
-	userId    string
+	UserId    string
 	Login     string
 	Name      string
 	Email     string
@@ -96,7 +96,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		// set the user id field
 		// GitHub OAuth users need not have a public email visible, but let's worry
 		// about that later.
-		user.userId = getUserId(user)
+		user.UserId = getUserId(user)
 		data, err := json.Marshal(user)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
