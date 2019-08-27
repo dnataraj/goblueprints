@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"crypto/md5"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -17,8 +19,10 @@ type authHandler struct {
 }
 
 type User struct {
+	userId    string
 	Login     string
 	Name      string
+	Email     string
 	HTMLURL   string `json:"html_url"`
 	AvatarURL string `json:"avatar_url"`
 }
@@ -89,6 +93,10 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		// set the user id field
+		// GitHub OAuth users need not have a public email visible, but let's worry
+		// about that later.
+		user.userId = getUserId(user)
 		data, err := json.Marshal(user)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -114,4 +122,15 @@ func unwrapCookie(cookie *http.Cookie) (*User, error) {
 	}
 
 	return &user, nil
+}
+
+func getUserId(user User) string {
+	m := md5.New()
+	var id = user.Email
+	if len(id) == 0 {
+		id = user.Name
+	}
+	log.Printf("using id : %s", id)
+	io.WriteString(m, strings.ToLower(id))
+	return fmt.Sprintf("%x", m.Sum(nil))
 }

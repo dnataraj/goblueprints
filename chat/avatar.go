@@ -1,10 +1,15 @@
 package main
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 // ErrNoAvatarURL is the error that is returned when the Avatar instance
 // is unable to provide avatar URL
 var ErrNoAvatarURL = errors.New("chat: unable to get an avatar URL")
+
+const DefaultAvatarURL = "https://www.gravatar.com/avatar"
 
 // Avatar represents types capable of representing user profile pictures
 type Avatar interface {
@@ -24,4 +29,15 @@ func (AuthAvatar) GetAvatarURL(c *client) (string, error) {
 		return "", ErrNoAvatarURL
 	}
 	return c.userData.AvatarURL, nil
+}
+
+type GravatarAvatar struct{}
+
+var UseGravatar GravatarAvatar
+
+func (GravatarAvatar) GetAvatarURL(c *client) (string, error) {
+	if c.userData == nil || len(c.userData.userId) == 0 {
+		return "", ErrNoAvatarURL
+	}
+	return fmt.Sprintf("//www.gravatar.com/avatar/%s", c.userData.userId), nil
 }
