@@ -1,14 +1,11 @@
 package main
 
 import (
-	"context"
-	"errors"
+	"fmt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 	"log"
 	"net/http"
-	"time"
 )
 
 type poll struct {
@@ -30,31 +27,33 @@ func (s *Server) handlePolls(w http.ResponseWriter, r *http.Request) {
 	case "DELETE":
 		s.handlePollsDelete(w, r)
 		return
+	case "OPTIONS":
+		w.Header().Add("Access-Control-Allow-Methods", "DELETE")
+		respond(w, r, http.StatusOK, nil)
+		return
 	}
 	respondHHTTPErr(w, r, http.StatusNotFound)
 }
 
 func (s *Server) handlePollsGet(w http.ResponseWriter, r *http.Request) {
-	//respondErr(w, r, http.StatusInternalServerError, errors.New("not implemented"))
-	ctx, _ := context.WithTimeout(context.Background(), 15*time.Second)
+	//ctx, _ := context.WithTimeout(context.Background(), 15*time.Second)
 	c := s.client.Database("ballots").Collection("polls")
 	path := NewPath(r.URL.Path)
-	var cur *mongo.Cursor
 	var err error
 	var result []*poll
-	var p poll
 	if path.HasID() {
 		// get specific poll
 		log.Println("fetching poll with id :", path.ID)
 		id, _ := primitive.ObjectIDFromHex(path.ID)
+		var p poll
 		err = c.FindOne(r.Context(), bson.D{{"_id", id}}).Decode(&p)
 		if err == nil {
 			result = append(result, &p)
 		}
 	} else {
-		cur, err = c.Find(ctx, bson.D{})
+		cur, err := c.Find(r.Context(), bson.D{})
 		if err == nil {
-			err = cur.All(ctx, &result)
+			err = cur.All(r.Context(), &result)
 		}
 	}
 	if err != nil {
@@ -66,9 +65,45 @@ func (s *Server) handlePollsGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePollsPost(w http.ResponseWriter, r *http.Request) {
-	respondErr(w, r, http.StatusInternalServerError, errors.New("not implemented"))
+	//respondErr(w, r, http.StatusInternalServerError, errors.New("not implemented"))
+	//ctx, _ := context.WithTimeout(context.Background(), 15*time.Second)
+	c := s.client.Database("ballots").Collection("polls")
+	var p poll
+	if err := decodeBody(r, &p); err != nil {
+		respondErr(w, r, http.StatusBadRequest, "failed to read poll from request", err)
+		return
+	}
+	apikey, ok := APIKey(r.Context())
+	if ok {
+		p.APIKey = apikey
+	}
+	//var id primitive.ObjectID
+	var id = primitive.NewObjectID()
+	p.ID = &id
+
+	if res, err := c.InsertOne(r.Context(), p); err != nil {
+		respondErr(w, r, http.StatusInternalServerError, "failed to insert poll", err)
+		id := res.InsertedID.(primitive.ObjectID)
+		log.Println("created poll with id: ", id.Hex())
+		return
+	}
+	w.Header().Set("Location", fmt.Sprintf("polls/%s", p.ID.Hex()))
+	respond(w, r, http.StatusCreated, nil)
 }
 
 func (s *Server) handlePollsDelete(w http.ResponseWriter, r *http.Request) {
-	respondErr(w, r, http.StatusInternalServerError, errors.New("not implemented"))
+	//respondErr(w, r, http.StatusInternalServerError, errors.New("not implemented"))
+	//ctx, _ := context.WithTimeout(context.Background(), 15*time.Second)
+	c := s.client.Database("ballots").Collection("polls")
+	path := NewPath(r.URL.Path)
+	if !path.HasID() {
+		respondErr(w, r, http.StatusInternalServerError, "cannot delete all polls")
+		return
+	}
+	id, _ := primitive.ObjectIDFromHex(path.ID)
+	if _, err := c.DeleteOne(r.Context(), bson.D{{"_id", id}}); err != nil {
+		respondErr(w, r, http.StatusInternalServerError, "failed to delete poll", err)
+		return
+	}
+	respond(w, r, http.StatusOK, nil)
 }
