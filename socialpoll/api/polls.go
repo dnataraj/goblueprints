@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"errors"
-	"github.com/globalsign/mgo/bson"
-	bson2 "go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
 	"net/http"
@@ -12,11 +12,11 @@ import (
 )
 
 type poll struct {
-	ID      bson.ObjectId  `bson:"_id" json:"id"`
-	Title   string         `json:"title"`
-	Options []string       `json:"options"`
-	Results map[string]int `json:"results,omitempty"`
-	APIKey  string         `json:"apikey"`
+	ID      *primitive.ObjectID `bson:"_id" json:"id"`
+	Title   string              `json:"title"`
+	Options []string            `json:"options"`
+	Results map[string]int      `json:"results,omitempty"`
+	APIKey  string              `json:"apikey"`
 }
 
 func (s *Server) handlePolls(w http.ResponseWriter, r *http.Request) {
@@ -42,22 +42,25 @@ func (s *Server) handlePollsGet(w http.ResponseWriter, r *http.Request) {
 	var cur *mongo.Cursor
 	var err error
 	var result []*poll
+	var p poll
 	if path.HasID() {
 		// get specific poll
-		err = c.FindOne(r.Context(), bson.D{{"_id", path.ID}}).Decode(&result)
+		log.Println("fetching poll with id :", path.ID)
+		id, _ := primitive.ObjectIDFromHex(path.ID)
+		err = c.FindOne(r.Context(), bson.D{{"_id", id}}).Decode(&p)
+		if err == nil {
+			result = append(result, &p)
+		}
 	} else {
-		cur, err = c.Find(ctx, bson2.D{})
+		cur, err = c.Find(ctx, bson.D{})
+		if err == nil {
+			err = cur.All(ctx, &result)
+		}
 	}
 	if err != nil {
 		log.Println("error extracting cursor: ", err)
 		respondErr(w, r, http.StatusInternalServerError, err)
 		return
-	}
-	var p poll
-	for cur.Next(ctx) {
-		err = cur.Decode(&p)
-		log.Println("found poll: ", cur.ID())
-		result = append(result, &p)
 	}
 	respond(w, r, http.StatusOK, &result)
 }
