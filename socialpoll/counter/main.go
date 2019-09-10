@@ -37,9 +37,18 @@ func doCount(ctx context.Context, countsLock *sync.Mutex, counts *map[string]int
 	log.Println(*counts)
 	ok := true
 	for option, count := range *counts {
-		sel := bson.M{"options": bson.M{"$in": []string{option}}}
-		up := bson.M{"$inc": bson.M{"results." + option: count}}
-		if _, err := polldata.UpdateMany(ctx, sel, up); err != nil {
+		sel := bson.D{{
+			"options", bson.D{{"$in", bson.A{option}}},
+		}}
+		//"options": bson.M{"$in": []string{option}}}
+		up := bson.D{{
+			"$inc",
+			bson.D{{
+				"results." + option,
+				count,
+			}},
+		}}
+		if _, err := polldata.UpdateOne(ctx, sel, up); err != nil {
 			log.Println("failed to update: ", err)
 			ok = false
 		}

@@ -69,6 +69,7 @@ func (s *Server) handlePollsPost(w http.ResponseWriter, r *http.Request) {
 	//ctx, _ := context.WithTimeout(context.Background(), 15*time.Second)
 	c := s.client.Database("ballots").Collection("polls")
 	var p poll
+	log.Println("creating new poll: ", p)
 	if err := decodeBody(r, &p); err != nil {
 		respondErr(w, r, http.StatusBadRequest, "failed to read poll from request", err)
 		return
@@ -80,6 +81,7 @@ func (s *Server) handlePollsPost(w http.ResponseWriter, r *http.Request) {
 	//var id primitive.ObjectID
 	var id = primitive.NewObjectID()
 	p.ID = &id
+	p.Results = map[string]int{}
 
 	if res, err := c.InsertOne(r.Context(), p); err != nil {
 		respondErr(w, r, http.StatusInternalServerError, "failed to insert poll", err)
@@ -101,6 +103,7 @@ func (s *Server) handlePollsDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	id, _ := primitive.ObjectIDFromHex(path.ID)
+	log.Println("attempting to delete poll with id: ", id)
 	if _, err := c.DeleteOne(r.Context(), bson.D{{"_id", id}}); err != nil {
 		respondErr(w, r, http.StatusInternalServerError, "failed to delete poll", err)
 		return
